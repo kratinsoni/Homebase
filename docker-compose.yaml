@@ -1,0 +1,72 @@
+services:
+  redis-homebase:
+    image: redis:7
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    container_name: postgres-homebase
+    environment:
+      POSTGRES_DB: homebase
+      POSTGRES_USER: homebase
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homebase -d homebase"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: .
+    command: uvicorn main:app --app-dir api --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips "*"
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis-homebase:6379
+      DATABASE_URL: postgresql://homebase:${POSTGRES_PASSWORD}@postgres:5432/homebase
+      DATA_DIR: /app/data
+      WORKSPACE_DIR: /app/workspace
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis-homebase
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: taskiq worker worker.jobqueue.tasks:broker --workers 1 --max-async-tasks 10
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis-homebase:6379
+      DATABASE_URL: postgresql://homebase:${POSTGRES_PASSWORD}@postgres:5432/homebase
+      DATA_DIR: /app/data
+      WORKSPACE_DIR: /app/workspace
+    volumes:
+      - ../workspace:/app/workspace
+    depends_on:
+      redis-homebase:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
