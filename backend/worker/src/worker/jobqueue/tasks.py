@@ -11,6 +11,8 @@ from worker.llm.configs import resolve
 from worker.tools.mcp.manager import DEFAULT_SERVERS, MCPManager
 import aiosqlite
 from worker.llm.profiles import get_mode_profile
+from worker.db.session import SessionLocal
+from worker.db.models import Message
 
 broker = RedisStreamBroker(settings.redis_url).with_result_backend(RedisAsyncResultBackend(redis_url=settings.redis_url))
 
@@ -55,7 +57,17 @@ async def run_agent(user_id: str, conversation_id: str, text: str, context: Cont
         }
 
         result = await app.ainvoke({"messages": [{"role": "user", "content": text}]}, config)
-        print(result["messages"][-1]["content"])
+        reply = result["messages"][-1]["content"] or ""
+
+        async with SessionLocal() as session:
+            session.add(Message(
+                conversation_id=conversation_id,
+                role="assistant",
+                task_id=context.message.task_id,
+                content=reply,
+            ))
+            await session.commit()
+
         return result["messages"][-1].get("content") or ""
     finally:
         await tools.close()

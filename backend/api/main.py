@@ -13,7 +13,6 @@ from routes.model_settings import router as model_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await create_tables()
     await broker.startup()    # ① runs one time, when the API starts
     yield                     # ② the API runs here and serves all requests
     await broker.shutdown()   # ③ runs one time, when the API stops (Ctrl+C)

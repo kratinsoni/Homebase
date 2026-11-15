@@ -20,6 +20,7 @@ def build_graph(adapter: ModelAdapter, tools=MCPManager, checkpointer=None):
 
     async def agent_node(state: AgentState):
         reply = await adapter.chat([SYSTEM] + state["messages"], tools=tools.schemas)
+
         return {"messages": [reply.model_dump(exclude_none=True)]}
 
     async def tools_node(state: AgentState):

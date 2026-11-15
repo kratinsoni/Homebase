@@ -5,14 +5,14 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from worker.config.settings import settings
 from worker.db.models import Base
 
-def _db_url() -> str:
+def db_url() -> str:
     if settings.database_url:
         return settings.database_url.replace("postgres://", "postgresql+asyncpg://", 1)
     data_dir = Path(settings.data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     return f"sqlite+aiosqlite:///{(data_dir / 'app.db').as_posix()}"
 
-engine = create_async_engine(_db_url())
+engine = create_async_engine(db_url())
 
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 

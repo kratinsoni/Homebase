@@ -1,4 +1,5 @@
 from typing import List
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
@@ -6,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import get_current_user
-from worker.db.models import User, Conversation, TaskRecord
+from worker.db.models import User, Conversation, TaskRecord, Message
 from worker.db.session import get_session
 from worker.jobqueue.tasks import run_agent
 from worker.db.models import ModelSettings
@@ -30,6 +31,14 @@ class ConversationOut(BaseModel):
     id: str
     title: str
 
+class MessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    role: str
+    content: str
+    created_at: datetime
+
 @router.post("/chat", response_model=ChatOut)
 async def chat(body: ChatIn, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)):
     has_settings = await session.scalar(
@@ -49,7 +58,8 @@ async def chat(body: ChatIn, user: User = Depends(get_current_user), session: As
 
     task = await run_agent.kiq(user_id=user.id, conversation_id=conversation.id, text=body.text)
 
-    session.add(TaskRecord(id=task.task_id, user_id=user.id, conversation_id=conversation.id))
+    session.add(TaskRecord(user_id=user.id, id=task.task_id, conversation_id=conversation.id))
+    session.add(Message(conversation_id=conversation.id, role="user", task_id=task.task_id, content=body.text))
     await session.commit()
 
     return ChatOut(task_id=task.task_id, conversation_id=conversation.id)
@@ -61,4 +71,14 @@ async def list_conversations(user: User = Depends(get_current_user), session: As
         .where(Conversation.user_id == user.id)
         .order_by(Conversation.created_at.desc())
     )
+    return rows.all()
+
+@router.get("/conversations/{converstation_id}/messages", response_model=List[MessageOut])
+async def get_message(conversation_id: str, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)):
+    conversation = await session.get(Conversation, conversation_id)
+    if conversation is None or conversation.user_id != user.id:
+        raise HTTPException(status_code=400, detail="Conversation not found")
+
+    rows = await session.scalars(select(Message).where(Message.conversation_id == conversation_id).order_by(Message.created_at))
+
     return rows.all()
