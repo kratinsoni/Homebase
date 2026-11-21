@@ -23,40 +23,10 @@ def read_file(path: str) -> str:
     text = file.read_text(encoding="utf-8", errors="replace")
     return text[:4000]  # keep the context small for local models
 
-
-READ_FILE_SCHEMA = {
-    "type": "function",
-    "function": {
-        "name": "read_file",
-        "description": "Read a text file from the user's workspace.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "File path inside the workspace."}
-            },
-            "required": ["path"],
-        },
-    },
-}
-
-
-LIST_FILES_SCHEMA = {
-    "type": "function",
-    "function": {
-        "name": "list_files",
-        "description": "List the files and folders in the user's workspace.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "subfolder": {
-                    "type": "string",
-                    "description": "Subfolder inside the workspace. Empty string for the root.",
-                }
-            },
-            "required": [],
-        },
-    },
-}
-
-TOOLS = {"list_files": list_files, "read_file": read_file}
-SCHEMAS = [LIST_FILES_SCHEMA, READ_FILE_SCHEMA]
+def write_file(path: str, content: str) -> str:
+    file = (WORKSPACE / path).resolve()
+    if not file.is_relative_to(WORKSPACE):
+        return "Error: access outside the workspace is not allowed."
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text(content, encoding="utf-8")
+    return f"Saved {len(content)} characters to {path}."

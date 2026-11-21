@@ -8,7 +8,7 @@ from worker.encrytion import decrypt
 class MissingModelSettings(Exception):
     pass
 
-async def get_mode_profile(user_id: str) -> ModelProfile:
+async def get_model_profile(user_id: str) -> ModelProfile:
     async with SessionLocal() as session:
         row = await session.scalar(select(ModelSettings).where(ModelSettings.user_id == user_id))
 

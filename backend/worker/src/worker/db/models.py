@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, Text
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, Text, JSON
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, MappedColumn
 
 
@@ -62,3 +62,15 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text)
     task_id: Mapped[str | None] = mapped_column(String(64), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+class Approval(Base):
+    __tablename__ = "approvals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    task_id: Mapped[str] = mapped_column(String(64))  # the task that stopped
+    payload: Mapped[dict] = mapped_column(JSON)  # what the agent wants to do
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)

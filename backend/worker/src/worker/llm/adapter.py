@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from openai import AsyncOpenAI
 
+
 @dataclass
 class ModelConfig:
     base_url: str

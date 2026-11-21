@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from auth import get_current_user
+from services.auth import get_current_user
 from worker.db.models import User, TaskRecord
 from worker.db.session import get_session
 from worker.jobqueue.tasks import broker
@@ -34,7 +34,7 @@ async def get_task(task_id: str, user: User = Depends(get_current_user), session
     result = await backend.get_result(task_id)
 
     if result.is_err:
-        raise {"task_id": task_id, "status": "failed", "err": str(result.err)}
+        raise {"task_id": task_id, "status": "failed", "err": str(result.error)}
 
     return {"task_id": task_id, "status": "done", "reply": result.return_value}
 

@@ -6,11 +6,11 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auth import get_current_user
-from worker.db.models import User, Conversation, TaskRecord, Message
+from services.auth import get_current_user
+from worker.db.models import User, Conversation, Message, Approval
 from worker.db.session import get_session
-from worker.jobqueue.tasks import run_agent
 from worker.db.models import ModelSettings
+from services.chat import start_chat_task
 
 router = APIRouter(tags=['chat'])
 
@@ -24,6 +24,8 @@ class ChatOut(BaseModel):
     task_id: str
     conversation_id: str
 
+class ConversationIn(BaseModel):
+    title: str = ""
 
 class ConversationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -56,12 +58,7 @@ async def chat(body: ChatIn, user: User = Depends(get_current_user), session: As
         session.add(conversation)
         await session.flush()
 
-    task = await run_agent.kiq(user_id=user.id, conversation_id=conversation.id, text=body.text)
-
-    session.add(TaskRecord(user_id=user.id, id=task.task_id, conversation_id=conversation.id))
-    session.add(Message(conversation_id=conversation.id, role="user", task_id=task.task_id, content=body.text))
-    await session.commit()
-
+    task = await start_chat_task(session, user, conversation.id, body.text)
     return ChatOut(task_id=task.task_id, conversation_id=conversation.id)
 
 @router.get("/conversations", response_model=List[ConversationOut])
@@ -82,3 +79,18 @@ async def get_message(conversation_id: str, user: User = Depends(get_current_use
     rows = await session.scalars(select(Message).where(Message.conversation_id == conversation_id).order_by(Message.created_at))
 
     return rows.all()
+
+@router.post("/conversations", response_model=ConversationOut, status_code=201)
+async def create_conversation(body: ConversationIn, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)):
+    conversation = Conversation(user_id=user.id, title=body.title[:200])
+    session.add(conversation)
+
+    await session.commit()
+
+    return conversation
+
+@router.get("/conversations/{conversation_id}/approvals/pending")
+async def pending_approvals(conversation_id: str, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)):
+    rows = await session.scalars(select(Approval).where(Approval.conversation_id == conversation_id, Approval.user_id == user.id, Approval.status == "pending"))
+
+    return [{"id": a.id, "payload": a.payload, "created_at": a.created_at} for a in rows]

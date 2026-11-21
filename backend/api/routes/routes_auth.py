@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auth import create_access_token, get_current_user, hash_password, verify_password
+from services.auth import create_access_token, get_current_user, hash_password, verify_password
 from worker.db.models import User
 from worker.db.session import get_session
 

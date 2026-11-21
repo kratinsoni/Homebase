@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from auth import get_current_user
+from services.auth import get_current_user
 from worker.db.models import ModelSettings, User, utc_now
 from worker.db.session import get_session
 from worker.encrytion import encrypt
